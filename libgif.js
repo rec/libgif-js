@@ -3,7 +3,11 @@
 
   Example usage:
 
-    <img src="./example1_preview.gif" rel:animated_src="./example1.gif" width="360" height="360" rel:auto_play="1" />
+    <img src="./example1_preview.gif"
+         rel:animated_src="./example1.gif"
+         width="360"
+         height="360"
+         rel:auto_play="1" />
 
     <script type="text/javascript">
       $$('img').each(function (img_tag) {
@@ -16,104 +20,105 @@
 
   Image tag attributes:
 
-    rel:animated_src -  If this url is specified, it's loaded into the player instead of src.
-              This allows a preview frame to be shown until animated gif data is streamed into the canvas
+    rel:animated_src - If this url is specified, it's loaded into the player
+              instead of src.  This allows a preview frame to be shown until
+              animated gif data is streamed into the canvas
 
-    rel:auto_play -    Defaults to 1 if not specified. If set to zero, a call to the play() method is needed
+    rel:auto_play - Defaults to 1 if not specified. If set to zero, a call to
+              the play() method is needed
 
-    rel:rubbable -    Defaults to 0 if not specified. If set to 1, the gif will be a canvas with handlers to handle rubbing.
+    rel:rubbable - Defaults to 0 if not specified. If set to 1, the gif will be
+               a canvas with handlers to handle rubbing.
 
   Constructor options
 
     gif         Required. The DOM element of an img tag.
-    auto_play       Optional. Same as the rel:auto_play attribute above, this arg overrides the img tag info.
-    max_width      Optional. Scale images over max_width down to max_width. Helpful with mobile.
-    rubbable      Optional. Make it rubbable.
+    auto_play   Optional. Same as the rel:auto_play attribute above, this arg
+                overrides the img tag info.
+    max_width   Optional. Scale images over max_width down to max_width.
+                Helpful with mobile.
+    rubbable    Optional. Make it rubbable.
 
   Instance methods
 
     // loading
-    load( callback )  Loads the gif into a canvas element and then calls callback if one is passed
+    load(callback)  Loads the gif into a canvas element and then calls callback
+                    if one is passed.
 
     // play controls
-    play -        Start playing the gif
-    pause -        Stop playing the gif
-    move_to(i) -    Move to frame i of the gif
-    move_relative(i) -  Move i frames ahead (or behind if i < 0)
+    play             Start playing the gif
+    pause            Stop playing the gif
+    move_to(i)       Move to frame i of the gif
+    move_relative(i) Move i frames ahead (or behind if i < 0)
 
     // getters
-    get_canvas      The canvas element that the gif is playing in. Handy for assigning event handlers to.
-    get_playing      Whether or not the gif is currently playing
-    get_loading      Whether or not the gif has finished loading/parsing
-    get_auto_play    Whether or not the gif is set to play automatically
-    get_length      The number of frames in the gif
+    get_canvas         The canvas element that the gif is playing in.
+                       Handy for assigning event handlers to.
+    get_playing        Whether or not the gif is currently playing
+    get_loading        Whether or not the gif has finished loading/parsing
+    get_auto_play      Whether or not the gif is set to play automatically
+    get_length         The number of frames in the gif
     get_current_frame  The index of the currently displayed frame of the gif
 
 */
 
 // Generic functions
-var bitsToNum = function (ba) {
-  return ba.reduce(function (s, n) {
-    return s * 2 + n;
-  }, 0);
+var bitsToNum = function(ba) {
+  function f(s, n) { return s * 2 + n; };
+  return ba.reduce(f, 0);
 };
 
-var byteToBitArr = function (bite) {
+var byteToBitArr = function(bite) {
   var a = [];
-  for (var i = 7; i >= 0; i--) {
-    a.push( !! (bite & (1 << i)));
-  }
+  for (var i = 7; i >= 0; i--)
+    a.push(!!(bite & (1 << i)));
+
   return a;
 };
 
-// Stream
-/**
- * @constructor
- */
-// Make compiler happy.
-var Stream = function (data) {
+var Stream = function(data) {
   this.data = data;
   this.len = this.data.length;
   this.pos = 0;
 
-  this.readByte = function () {
-    if (this.pos >= this.data.length) {
+  this.readByte = function() {
+    if (this.pos >= this.data.length)
       throw new Error('Attempted to read past end of stream.');
-    }
+
     return data.charCodeAt(this.pos++) & 0xFF;
   };
 
-  this.readBytes = function (n) {
+  this.readBytes = function(n) {
     var bytes = [];
-    for (var i = 0; i < n; i++) {
+    for (var i = 0; i < n; i++)
       bytes.push(this.readByte());
-    }
+
     return bytes;
   };
 
-  this.read = function (n) {
+  this.read = function(n) {
     var s = '';
-    for (var i = 0; i < n; i++) {
+    for (var i = 0; i < n; i++)
       s += String.fromCharCode(this.readByte());
-    }
+
     return s;
   };
 
-  this.readUnsigned = function () { // Little-endian.
+  this.readUnsigned = function() { // Little-endian.
     var a = this.readBytes(2);
     return (a[1] << 8) + a[0];
   };
 };
 
-var lzwDecode = function (minCodeSize, data) {
-  // TODO: Now that the GIF parser is a bit different, maybe this should get an array of bytes instead of a String?
+var lzwDecode = function(minCodeSize, data) {
+  // TODO: Now that the GIF parser is a bit different, maybe this should get an
+  // array of bytes instead of a String?
   var pos = 0; // Maybe this streaming thing should be merged with the Stream?
-  var readCode = function (size) {
+  var readCode = function(size) {
     var code = 0;
     for (var i = 0; i < size; i++) {
-      if (data.charCodeAt(pos >> 3) & (1 << (pos & 7))) {
+      if (data.charCodeAt(pos >> 3) & (1 << (pos & 7)))
         code |= 1 << i;
-      }
       pos++;
     }
     return code;
@@ -128,15 +133,13 @@ var lzwDecode = function (minCodeSize, data) {
 
   var dict = [];
 
-  var clear = function () {
+  var clear = function() {
     dict = [];
     codeSize = minCodeSize + 1;
-    for (var i = 0; i < clearCode; i++) {
+    for (var i = 0; i < clearCode; i++)
       dict[i] = [i];
-    }
     dict[clearCode] = [];
     dict[eoiCode] = null;
-
   };
 
   var code;
@@ -150,23 +153,22 @@ var lzwDecode = function (minCodeSize, data) {
       clear();
       continue;
     }
-    if (code === eoiCode) break;
+    if (code === eoiCode)
+      break;
 
     if (code < dict.length) {
-      if (last !== clearCode) {
+      if (last !== clearCode)
         dict.push(dict[last].concat(dict[code][0]));
-      }
-    }
-    else {
+    } else {
       if (code !== dict.length) throw new Error('Invalid LZW code.');
       dict.push(dict[last].concat(dict[last][0]));
     }
     output.push.apply(output, dict[code]);
 
-    if (dict.length === (1 << codeSize) && codeSize < 12) {
-      // If we're at the last code and codeSize is 12, the next code will be a clearCode, and it'll be 12 bits long.
+    // If we're at the last code and codeSize is 12, the next code will be a
+    // clearCode, and it'll be 12 bits long.
+    if (dict.length === (1 << codeSize) && codeSize < 12)
       codeSize++;
-    }
   }
 
   // I don't know if this is technically an error, but some GIFs do it.
@@ -176,19 +178,18 @@ var lzwDecode = function (minCodeSize, data) {
 
 
 // The actual parsing; returns an object with properties.
-var parseGIF = function (st, handler) {
+var parseGIF = function(st, handler) {
   handler || (handler = {});
 
   // LZW (GIF-specific)
-  var parseCT = function (entries) { // Each entry is 3 bytes, for RGB.
+  var parseCT = function(entries) { // Each entry is 3 bytes, for RGB.
     var ct = [];
-    for (var i = 0; i < entries; i++) {
+    for (var i = 0; i < entries; i++)
       ct.push(st.readBytes(3));
-    }
     return ct;
   };
 
-  var readSubBlocks = function () {
+  var readSubBlocks = function() {
     var size, data;
     data = '';
     do {
@@ -198,11 +199,14 @@ var parseGIF = function (st, handler) {
     return data;
   };
 
-  var parseHeader = function () {
+  var parseHeader = function() {
     var hdr = {};
     hdr.sig = st.read(3);
     hdr.ver = st.read(3);
-    if (hdr.sig !== 'GIF') throw new Error('Not a GIF file.'); // XXX: This should probably be handled more nicely.
+    if (hdr.sig !== 'GIF')
+      throw new Error('Not a GIF file.');
+    // TODO: This should probably be handled more nicely.
+
     hdr.width = st.readUnsigned();
     hdr.height = st.readUnsigned();
 
@@ -213,15 +217,15 @@ var parseGIF = function (st, handler) {
     hdr.gctSize = bitsToNum(bits.splice(0, 3));
 
     hdr.bgColor = st.readByte();
-    hdr.pixelAspectRatio = st.readByte(); // if not 0, aspectRatio = (pixelAspectRatio + 15) / 64
-    if (hdr.gctFlag) {
+    hdr.pixelAspectRatio = st.readByte();
+    // if not 0, aspectRatio = (pixelAspectRatio + 15) / 64
+    if (hdr.gctFlag)
       hdr.gct = parseCT(1 << (hdr.gctSize + 1));
-    }
     handler.hdr && handler.hdr(hdr);
   };
 
-  var parseExt = function (block) {
-    var parseGCExt = function (block) {
+  var parseExt = function(block) {
+    var parseGCExt = function(block) {
       var blockSize = st.readByte(); // Always 4
       var bits = byteToBitArr(st.readByte());
       block.reserved = bits.splice(0, 3); // Reserved; should be 000.
@@ -230,20 +234,18 @@ var parseGIF = function (st, handler) {
       block.transparencyGiven = bits.shift();
 
       block.delayTime = st.readUnsigned();
-
       block.transparencyIndex = st.readByte();
-
       block.terminator = st.readByte();
 
       handler.gce && handler.gce(block);
     };
 
-    var parseComExt = function (block) {
+    var parseComExt = function(block) {
       block.comment = readSubBlocks();
       handler.com && handler.com(block);
     };
 
-    var parsePTExt = function (block) {
+    var parsePTExt = function(block) {
       // No one *ever* uses this. If you use it, deal with parsing it yourself.
       var blockSize = st.readByte(); // Always 12
       block.ptHeader = st.readBytes(12);
@@ -251,8 +253,8 @@ var parseGIF = function (st, handler) {
       handler.pte && handler.pte(block);
     };
 
-    var parseAppExt = function (block) {
-      var parseNetscapeExt = function (block) {
+    var parseAppExt = function(block) {
+      var parseNetscapeExt = function(block) {
         var blockSize = st.readByte(); // Always 3
         block.unknown = st.readByte(); // ??? Always 1? What is this?
         block.iterations = st.readUnsigned();
@@ -260,7 +262,7 @@ var parseGIF = function (st, handler) {
         handler.app && handler.app.NETSCAPE && handler.app.NETSCAPE(block);
       };
 
-      var parseUnknownAppExt = function (block) {
+      var parseUnknownAppExt = function(block) {
         block.appData = readSubBlocks();
         // FIXME: This won't work if a handler wants to match on any identifier.
         handler.app && handler.app[block.identifier] && handler.app[block.identifier](block);
@@ -269,17 +271,18 @@ var parseGIF = function (st, handler) {
       var blockSize = st.readByte(); // Always 11
       block.identifier = st.read(8);
       block.authCode = st.read(3);
+
       switch (block.identifier) {
-      case 'NETSCAPE':
+       case 'NETSCAPE':
         parseNetscapeExt(block);
         break;
-      default:
+       default:
         parseUnknownAppExt(block);
         break;
       }
     };
 
-    var parseUnknownExt = function (block) {
+    var parseUnknownExt = function(block) {
       block.data = readSubBlocks();
       handler.unknown && handler.unknown(block);
     };
@@ -309,13 +312,13 @@ var parseGIF = function (st, handler) {
     }
   };
 
-  var parseImg = function (img) {
-    var deinterlace = function (pixels, width) {
+  var parseImg = function(img) {
+    var deinterlace = function(pixels, width) {
       // Of course this defeats the purpose of interlacing. And it's *probably*
       // the least efficient way it's ever been implemented. But nevertheless...
       var newPixels = new Array(pixels.length);
       var rows = pixels.length / width;
-      var cpRow = function (toRow, fromRow) {
+      var cpRow = function(toRow, fromRow) {
         var fromPixels = pixels.slice(fromRow * width, (fromRow + 1) * width);
         newPixels.splice.apply(newPixels, [toRow * width, width].concat(fromPixels));
       };
@@ -347,9 +350,8 @@ var parseGIF = function (st, handler) {
     img.reserved = bits.splice(0, 2);
     img.lctSize = bitsToNum(bits.splice(0, 3));
 
-    if (img.lctFlag) {
+    if (img.lctFlag)
       img.lct = parseCT(1 << (img.lctSize + 1));
-    }
 
     img.lzwMinCodeSize = st.readByte();
 
@@ -357,14 +359,13 @@ var parseGIF = function (st, handler) {
 
     img.pixels = lzwDecode(img.lzwMinCodeSize, lzwData);
 
-    if (img.interlaced) { // Move
+    if (img.interlaced) // Move
       img.pixels = deinterlace(img.pixels, img.width);
-    }
 
     handler.img && handler.img(img);
   };
 
-  var parseBlock = function () {
+  var parseBlock = function() {
     var block = {};
     block.sentinel = st.readByte();
 
@@ -382,13 +383,15 @@ var parseGIF = function (st, handler) {
       handler.eof && handler.eof(block);
       break;
     default:
-      throw new Error('Unknown block: 0x' + block.sentinel.toString(16)); // TODO: Pad this with a 0.
+      throw new Error('Unknown block: 0x' + block.sentinel.toString(16));
+      // TODO: Pad this with a 0.
     }
 
-    if (block.type !== 'eof') setTimeout(parseBlock, 0);
+    if (block.type !== 'eof')
+      setTimeout(parseBlock, 0);
   };
 
-  var parse = function () {
+  var parse = function() {
     parseHeader();
     setTimeout(parseBlock, 0);
   };
@@ -397,7 +400,7 @@ var parseGIF = function (st, handler) {
 };
 
 
-var SuperGif = function ( options ) {
+var SuperGif = function( options ) {
 
   var stream;
   var hdr;
@@ -424,7 +427,7 @@ var SuperGif = function ( options ) {
   if (typeof options.rubbable == 'undefined')
     options.rubbable = (!gif.getAttribute('rel:rubbable') || gif.getAttribute('rel:rubbable') == '1');
 
-  var clear = function () {
+  var clear = function() {
     transparency = null;
     delay = null;
     lastDisposalMethod = disposalMethod;
@@ -434,7 +437,7 @@ var SuperGif = function ( options ) {
 
   // XXX: There's probably a better way to handle catching exceptions when
   // callbacks are involved.
-  var doParse = function () {
+  var doParse = function() {
     try {
       parseGIF(stream, handler);
     }
@@ -443,12 +446,12 @@ var SuperGif = function ( options ) {
     }
   };
 
-  var doText = function (text) {
+  var doText = function(text) {
     toolbar.innerHTML = text; // innerText? Escaping? Whatever.
     toolbar.style.visibility = 'visible';
   };
 
-  var doShowProgress = function (pos, length, draw) {
+  var doShowProgress = function(pos, length, draw) {
     if (draw) {
       var height = 25;
       var top = (canvas.height - height);
@@ -465,8 +468,8 @@ var SuperGif = function ( options ) {
     }
   };
 
-  var doLoadError = function (originOfError) {
-    var drawError = function () {
+  var doLoadError = function(originOfError) {
+    var drawError = function() {
       ctx.fillStyle = 'black';
       ctx.fillRect(0, 0, hdr.width, hdr.height);
       ctx.strokeStyle = 'red';
@@ -487,7 +490,7 @@ var SuperGif = function ( options ) {
     drawError();
   };
 
-  var doHdr = function (_hdr) {
+  var doHdr = function(_hdr) {
     hdr = _hdr;
     canvas.width = hdr.width;
     canvas.height = hdr.height;
@@ -497,7 +500,7 @@ var SuperGif = function ( options ) {
     tmpCanvas.height = hdr.height;
   };
 
-  var doGCE = function (gce) {
+  var doGCE = function(gce) {
     pushFrame();
     clear();
     transparency = gce.transparencyGiven ? gce.transparencyIndex : null;
@@ -506,7 +509,7 @@ var SuperGif = function ( options ) {
     // We don't have much to do with the rest of GCE.
   };
 
-  var pushFrame = function () {
+  var pushFrame = function() {
     if (!frame) return;
     frames.push({
       data: frame.getImageData(0, 0, hdr.width, hdr.height),
@@ -514,17 +517,18 @@ var SuperGif = function ( options ) {
     });
   };
 
-  var firstImg = false;;
-  var firstCData = false;;
+  var firstImg = false;
+  var firstCData = false;
 
-  var doImg = function (img) {
+  var doImg = function(img) {
     if (!frame) frame = tmpCanvas.getContext('2d');
     var ct = img.lctFlag ? img.lct : hdr.gct; // TODO: What if neither exists?
     var cData = frame.getImageData(img.leftPos, img.topPos, img.width, img.height);
 
-    img.pixels.forEach(function (pixel, i) {
+    img.pixels.forEach(function(pixel, i) {
       // cData.data === [R,G,B,A,...]
-      if (transparency !== pixel) { // This includes null, if no transparency was defined.
+      if (transparency !== pixel) {
+        // This includes null, if no transparency was defined.
         cData.data[i * 4 + 0] = ct[pixel][0];
         cData.data[i * 4 + 1] = ct[pixel][1];
         cData.data[i * 4 + 2] = ct[pixel][2];
@@ -536,8 +540,7 @@ var SuperGif = function ( options ) {
         if (lastDisposalMethod === 2 || lastDisposalMethod === 3) {
           cData.data[i * 4 + 3] = 0; // Transparent.
           // XXX: This is very very wrong.
-        }
-        else {
+        } else {
           // lastDisposalMethod should be null (no GCE), 0, or 1; leave the pixel as it is.
           // assert(lastDispsalMethod === null || lastDispsalMethod === 0 || lastDispsalMethod === 1);
           // XXX: If this is the first frame (and we *do* have a GCE),
@@ -547,13 +550,12 @@ var SuperGif = function ( options ) {
       }
     });
 
-    if (!firstImg) firstImg = img;
-    if (!firstCData) firstCData = cData;
+    firstImg = firstImg || img;
+    firstCData = firstCData || cData;
 
     frame.putImageData(cData, img.leftPos, img.topPos);
 
-    if (!ctx_scaled)
-    {
+    if (!ctx_scaled) {
       ctx.scale(get_canvas_scale(),get_canvas_scale());
       ctx_scaled = true;
     }
@@ -561,10 +563,9 @@ var SuperGif = function ( options ) {
     // We could use the on-page canvas directly, except that we draw a progress
     // bar for each image chunk (not just the final image).
     ctx.drawImage(tmpCanvas, 0, 0);
-
   };
 
-  var player = (function () {
+  var player = (function() {
     var i = -1;
     var curFrame;
     var delayInfo;
@@ -572,60 +573,60 @@ var SuperGif = function ( options ) {
     var showingInfo = false;
     var pinned = false;
 
-    var stepFrame = function (delta) { // XXX: Name is confusing.
+    var stepFrame = function(delta) { // XXX: Name is confusing.
       i = (i + delta + frames.length) % frames.length;
       curFrame = i + 1;
       delayInfo = frames[i].delay;
       putFrame();
     };
 
-    var step = (function () {
+    var step = (function() {
       var stepping = false;
 
-      var doStep = function () {
+      var doStep = function() {
         stepping = playing;
-        if (!stepping) return;
-
-        stepFrame(forward ? 1 : -1);
-        var delay = frames[i].delay * 10;
-        if (!delay) delay = 100; // FIXME: Should this even default at all? What should it be?
-        setTimeout(doStep, delay);
+        if (stepping) {
+          stepFrame(forward ? 1 : -1);
+          var delay = frames[i].delay * 10;
+          if (!delay)
+            delay = 100;
+          // FIXME: Should this even default at all? What should it be?
+          setTimeout(doStep, delay);
+        }
       };
 
-      return function () {
-        if (!stepping) setTimeout(doStep, 0);
+      return function() {
+        if (!stepping)
+          setTimeout(doStep, 0);
       };
     }());
 
-    var putFrame = function () {
+    var putFrame = function() {
       curFrame = i;
-
       tmpCanvas.getContext("2d").putImageData(frames[i].data, 0, 0);
-
       ctx.drawImage(tmpCanvas, 0, 0);
-
     };
 
-    var play = function () {
+    var play = function() {
       playing = true;
       step();
     };
 
-    var pause = function () {
+    var pause = function() {
       playing = false;
     };
 
 
     return {
-      init: function () {
-        if (loadError) return;
+      init: function() {
+        if (loadError)
+          return;
 
         ctx.scale(get_canvas_scale(),get_canvas_scale());
 
         if (options.auto_play) {
           step();
-        }
-        else {
+        } else {
           i = 0;
           putFrame();
         }
@@ -638,90 +639,93 @@ var SuperGif = function ( options ) {
       move_relative: stepFrame,
       current_frame: function() { return i; },
       length: function() { return frames.length },
-      move_to: function ( frame_idx ) {
+      move_to: function( frame_idx ) {
         i = frame_idx;
         putFrame();
       }
     }
   }());
 
-  var doDecodeProgress = function (draw) {
+  var doDecodeProgress = function(draw) {
     doShowProgress(stream.pos, stream.data.length, draw);
   };
 
-  var doNothing = function () {};
+  var doNothing = function() {};
   /**
-   * @param{boolean=} draw Whether to draw progress bar or not; this is not idempotent because of translucency.
-   *                       Note that this means that the text will be unsynchronized with the progress bar on non-frames;
-   *                       but those are typically so small (GCE etc.) that it doesn't really matter. TODO: Do this properly.
+   * @param{boolean=} draw Whether to draw progress bar or not; this is not
+   *                       idempotent because of translucency.  Note that this
+   *                       means that the text will be unsynchronized with the
+   *                       progress bar on non-frames; but those are typically
+   *                       so small (GCE etc.) that it doesn't really
+   *                       matter. TODO: Do this properly.
    */
-  var withProgress = function (fn, draw) {
-    return function (block) {
+  var withProgress = function(fn, draw) {
+    return function(block) {
       fn(block);
       doDecodeProgress(draw);
     };
   };
 
-  var register_canvas_handers = function () {
+  var register_canvas_handers = function() {
+    var maxTime = 1000,
+      // allow movement if < 1000 ms (1 sec)
+      maxDistance = Math.floor(canvas.width / (player.length() * 2)),
+      // swipe movement of 50 pixels triggers the swipe
+      startX = 0,
+      startTime = 0;
 
-      var maxTime = 1000,
-        // allow movement if < 1000 ms (1 sec)
-        maxDistance = Math.floor(canvas.width / (player.length() * 2)),
-        // swipe movement of 50 pixels triggers the swipe
-        startX = 0,
-        startTime = 0;
+    var cantouch = "ontouchend" in document;
 
-      var cantouch = "ontouchend" in document;
+    var aj = 0;
+    var last_played = 0;
 
-      var aj = 0;
-      var last_played = 0;
+    var startup = function(e) {
+      // prevent image drag (Firefox)
+      e.preventDefault();
+      if (options.auto_play)
+        player.pause();
 
-      var startup = function (e) {
-        // prevent image drag (Firefox)
-        e.preventDefault();
-        if (options.auto_play) player.pause();
+      var pos = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
 
-        var pos = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
+      var x = (pos.layerX > 0) ? pos.layerX : canvas.width / 2;
+      var progress = x / canvas.width;
 
-        var x = (pos.layerX > 0) ? pos.layerX : canvas.width / 2;
-        var progress = x / canvas.width;
+      player.move_to(Math.floor(progress * (player.length() - 1)));
 
-        player.move_to( Math.floor(progress * (player.length() - 1)) );
+      startTime = e.timeStamp;
+      startX = pos.pageX;
+    };
+    canvas.addEventListener((cantouch) ? 'touchstart' : 'mousedown', startup );
+
+    var shutdown = function(e) {
+      startTime = 0;
+      startX = 0;
+      if (options.auto_play)
+        player.play();
+    };
+    canvas.addEventListener((cantouch) ? 'touchend' : 'mouseup', shutdown);
+
+    var moveprogress = function(e) {
+      e.preventDefault();
+      var pos = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
+
+      var currentX = pos.pageX;
+      currentDistance = (startX === 0) ? 0 : Math.abs(currentX - startX);
+      // allow if movement < 1 sec
+      currentTime = e.timeStamp;
+      if (startTime !== 0 && currentDistance > maxDistance) {
+        if (currentX < startX && player.current_frame() > 0)
+          player.move_relative(-1);
+        if (currentX > startX && player.current_frame() < player.length() - 1)
+          player.move_relative(1);
 
         startTime = e.timeStamp;
         startX = pos.pageX;
-      };
-      canvas.addEventListener((cantouch) ? 'touchstart' : 'mousedown', startup );
+      }
 
-      var shutdown = function (e) {
-        startTime = 0;
-        startX = 0;
-        if (options.auto_play) player.play();
-      };
-      canvas.addEventListener((cantouch) ? 'touchend' : 'mouseup', shutdown);
-
-      var moveprogress = function (e) {
-        e.preventDefault();
-        var pos = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
-
-        var currentX = pos.pageX;
-        currentDistance = (startX === 0) ? 0 : Math.abs(currentX - startX);
-        // allow if movement < 1 sec
-        currentTime = e.timeStamp;
-        if (startTime !== 0 && currentDistance > maxDistance) {
-          if (currentX < startX && player.current_frame() > 0) {
-            player.move_relative(-1);
-          }
-          if (currentX > startX && player.current_frame() < player.length() - 1) {
-            player.move_relative(1);
-          }
-          startTime = e.timeStamp;
-          startX = pos.pageX;
-        }
-
-      };
-      canvas.addEventListener((cantouch) ? 'touchmove' : 'mousemove', moveprogress);
     };
+    canvas.addEventListener((cantouch) ? 'touchmove' : 'mousemove', moveprogress);
+  };
 
 
   var handler = {
@@ -734,7 +738,7 @@ var SuperGif = function ( options ) {
       NETSCAPE: withProgress(doNothing)
     },
     img: withProgress(doImg, true),
-    eof: function (block) {
+    eof: function(block) {
       //toolbar.style.display = '';
       pushFrame();
       doDecodeProgress(false);
@@ -744,47 +748,38 @@ var SuperGif = function ( options ) {
       loading = false;
       register_canvas_handers();
       if (load_callback)
-      {
         load_callback();
-      }
-
     }
   };
 
-  var init = function () {
-      var parent = gif.parentNode;
+  var init = function() {
+    var parent = gif.parentNode;
 
-      var div = document.createElement('div');
-      canvas = document.createElement('canvas');
-      ctx = canvas.getContext('2d');
-      toolbar = document.createElement('div');
+    var div = document.createElement('div');
+    canvas = document.createElement('canvas');
+    ctx = canvas.getContext('2d');
+    toolbar = document.createElement('div');
 
-      tmpCanvas = document.createElement('canvas');
+    tmpCanvas = document.createElement('canvas');
 
-      div.width = canvas.width = gif.width;
-      div.height = canvas.height = gif.height;
-      toolbar.style.minWidth = gif.width + 'px';
+    div.width = canvas.width = gif.width;
+    div.height = canvas.height = gif.height;
+    toolbar.style.minWidth = gif.width + 'px';
 
-      div.className = 'jsgif';
-      toolbar.className = 'jsgif_toolbar';
-      div.appendChild(canvas);
-      div.appendChild(toolbar);
+    div.className = 'jsgif';
+    toolbar.className = 'jsgif_toolbar';
+    div.appendChild(canvas);
+    div.appendChild(toolbar);
 
-      parent.insertBefore(div, gif);
-      parent.removeChild(gif);
-
+    parent.insertBefore(div, gif);
+    parent.removeChild(gif);
   };
 
   var get_canvas_scale = function() {
     if (options.max_width && canvas.width > options.max_width)
-    {
       return options.max_width / canvas.width;
-    }
     else
-    {
       return 1;
-    }
-
   }
 
   var canvas, ctx, toolbar, tmpCanvas;
@@ -799,26 +794,14 @@ var SuperGif = function ( options ) {
     move_to: player.move_to,
 
     // getters for instance vars
-    get_playing: function() {
-      return player.playing;
-    },
-    get_canvas: function() {
-      return canvas;
-    },
-    get_loading: function() {
-      return loading
-    },
-    get_auto_play: function() {
-      return options.auto_play;
-    },
-    get_length: function() {
-      return player.length();
-    },
-    get_current_frame: function() {
-      return player.current_frame();
-    },
-    load: function (callback) {
+    get_playing: function() { return player.playing; },
+    get_canvas: function() { return canvas; },
+    get_loading: function() { return loading; },
+    get_auto_play: function() { return options.auto_play; },
+    get_length: function() { return player.length(); },
+    get_current_frame: function() { return player.current_frame(); },
 
+    load: function(callback) {
       if (callback) load_callback = callback;
       loading = true;
 
@@ -826,20 +809,19 @@ var SuperGif = function ( options ) {
       h.overrideMimeType('text/plain; charset=x-user-defined');
       h.onloadstart = function() {
         // Wait until connection is oppened to replace the gif element with a canvas to avoid a blank img
-        if (!initialized ) init();
+        if (!initialized)
+          init();
       };
       h.onload = function(e) {
         stream = new Stream(h.responseText);
         setTimeout(doParse, 0);
       };
-      h.onprogress = function (e) {
+      h.onprogress = function(e) {
         if (e.lengthComputable) doShowProgress(e.loaded, e.total, true);
       };
       h.onerror = function() { doLoadError('xhr'); };
       h.open('GET', gif.getAttribute('rel:animated_src') || gif.src, true);
       h.send();
-
-
     }
   };
 
